@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoMRU | Live Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Background Animation -->
+    <div class="bg-grid"></div>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-brands fa-bitcoin"></i> Crypto<span class="highlight">MRU</span>
+        </div>
+        <div class="lang-selector">
+            <button onclick="setLanguage('en')" class="active">🇬🇧</button>
+            <button onclick="setLanguage('ar')">🇦🇪</button>
+            <button onclick="setLanguage('fr')">🇫🇷</button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container">
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="dashboard" id="tab-dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="converter" id="tab-converter">Converter</button>
+        </div>
+
+        <!-- SECTION 1: DASHBOARD -->
+        <section id="dashboard" class="section active">
+            <div class="status-bar">
+                <span id="last-updated">Last Update: Just now</span>
+                <span class="live-indicator"><span class="dot"></span> LIVE</span>
+            </div>
+
+            <div class="cards-grid">
+                <!-- BTC Card - CoinGecko API -->
+                <div class="card btc-card">
+                    <div class="card-header">
+                        <i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC)                    </div>
+                    <div class="card-body">
+                        <div class="price-label" id="lbl-btc-usd">Price in USD</div>
+                        <div class="price-value" id="price-btc-usd">Loading...</div>
+                        <div class="api-source">📊 CoinGecko API</div>
+                    </div>
+                </div>
+
+                <!-- MRU Card - ExchangeRate API -->
+                <div class="card mru-card glow-effect">
+                    <div class="card-header">
+                        <i class="fa-solid fa-money-bill-wave"></i> USD to MRU
+                    </div>
+                    <div class="card-body">
+                        <div class="price-label" id="lbl-usd-mru">Exchange Rate</div>
+                        <div class="price-value" id="price-usd-mru">Loading...</div>
+                        <div class="api-source">📊 ExchangeRate API</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: CONVERTER -->
+        <section id="converter" class="section">
+            <div class="converter-box">
+                <h2 id="lbl-convert-title">Currency Converter</h2>
+                <div class="input-group">
+                    <input type="number" id="conv-amount" placeholder="Amount" value="1" step="any">
+                    <select id="conv-from">
+                        <option value="BTC">Bitcoin (BTC)</option>
+                        <option value="USD">US Dollar (USD)</option>
+                        <option value="MRU">Mauritanian Ouguiya (MRU)</option>
+                    </select>
+                </div>
+                <div class="arrow"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                <div class="input-group">
+                    <input type="text" id="conv-result" readonly placeholder="Result">
+                    <select id="conv-to">
+                        <option value="MRU">Mauritanian Ouguiya (MRU)</option>
+                        <option value="USD">US Dollar (USD)</option>
+                        <option value="BTC">Bitcoin (BTC)</option>
+                    </select>
+                </div>
+                <button onclick="convertCurrency()" id="btn-convert">Convert Now</button>
+                <p id="conv-error" style="color: #ff4444; margin-top: 10px; display: none;"></p>
+            </div>
+        </section>
+
+    </main>
+    <script src="script.js"></script>
+</body>
+                  </html>
