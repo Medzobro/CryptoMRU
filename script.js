@@ -1,14 +1,21 @@
 // --- CONFIGURATION ---
 const API_KEYS = {
-    COINGECKO: "CG-PvvJn7iqqY7oXJDXPoirgogr",
     EXCHANGE_RATE: "7690e500f736a474488a6e79"
 };
 
+// Multiple CORS Proxies (سنجربهم بالترتيب)
+const CORS_PROXIES = [
+    "https://api.allorigins.win/raw?url=",
+    "https://corsproxy.io/?",
+    "https://api.codetabs.com/v1/proxy?quest="
+];
+
 // --- STATE VARIABLES ---
-let btcPriceUSD = 0;
-let usdToMru = 0;
+let btcPriceUSD = 65000; // سعر افتراضي مبدئي
+let usdToMru = 39.75;    // سعر افتراضي مبدئي
 let currentLang = 'en';
 let isDataLoaded = false;
+let wsConnected = false;
 
 // --- TRANSLATIONS ---
 const translations = {
@@ -21,9 +28,9 @@ const translations = {
         convert_title: "Currency Converter",
         btn_convert: "Convert Now",
         loading: "Loading...",
-        error_msg: "Please wait for prices to load...",
-        success: "Updated",
-        error: "Error"
+        error_msg: "Using cached data",
+        success: "Live",
+        error: "Offline"
     },
     ar: {
         dashboard: "لوحة التحكم",
@@ -34,26 +41,13 @@ const translations = {
         convert_title: "محول العملات",
         btn_convert: "تحويل الآن",
         loading: "جاري التحميل...",
-        error_msg: "الرجاء الانتظار حتى يتم تحميل الأسعار...",
-        success: "تم التحديث",
-        error: "خطأ"
-    },
-    fr: {
-        dashboard: "Tableau de bord",
-        converter: "Convertisseur",
-        lbl_btc_usd: "Prix en USD",
-        lbl_usd_mru: "Taux de change (USD/MRU)",
-        last_updated: "Dernière mise à jour: ",
-        convert_title: "Convertisseur de devises",
-        btn_convert: "Convertir",
-        loading: "Chargement...",
-        error_msg: "Veuillez attendre le chargement...",        success: "Mis à jour",
-        error: "Erreur"
+        error_msg: "استخدام البيانات المؤقتة",
+        success: "مباشر",
+        error: "غير متصل"
     }
 };
 
-// --- DOM ELEMENTS ---
-const els = {
+// --- DOM ELEMENTS ---const els = {
     btcUsd: document.getElementById('price-btc-usd'),
     usdMru: document.getElementById('price-usd-mru'),
     lastUpdated: document.getElementById('last-updated'),
@@ -68,75 +62,116 @@ const els = {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("✅ CryptoMRU Initialized");
     setLanguage('en');
-    fetchPrices();
-    // Auto refresh every 10 seconds (as requested)
-    setInterval(fetchPrices, 10000);
+    
+    // عرض الأسعار الافتراضية فوراً
+    updateUI(btcPriceUSD, usdToMru);
+    
+    // الاتصال بـ Binance WebSocket
+    connectBinanceWebSocket();
+    
+    // جلب سعر الصرف كل 30 ثانية
+    fetchExchangeRate();
+    setInterval(fetchExchangeRate, 30000);
 });
 
-// --- API FUNCTIONS ---
-async function fetchPrices() {
-    const t = translations[currentLang];
-    updateStatus(t.loading);
-
-    try {
-        // API 1: CoinGecko for BTC/USD
-        const btcRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd`);
-        if (!btcRes.ok) throw new Error('CoinGecko API failed');
-        const btcData = await btcRes.json();
-        btcPriceUSD = btcData.bitcoin.usd;
-
-        // API 2: ExchangeRate for USD/MRU
-        const mruRes = await fetch(`https://v6.exchangerate-api.com/v6/${API_KEYS.EXCHANGE_RATE}/latest/USD`);
-        if (!mruRes.ok) throw new Error('ExchangeRate API failed');
-        const mruData = await mruRes.json();
-        usdToMru = mruData.conversion_rates.MRU;
-
-        // Validate data
-        if (btcPriceUSD > 0 && usdToMru > 0) {
-            isDataLoaded = true;
-            
-            // Update UI with High Precision            animateValue(els.btcUsd, btcPriceUSD, "$", 2);
-            animateValue(els.usdMru, usdToMru, "MRU", 4);
-            
-            updateStatus(t.success);
-        }
-
-    } catch (error) {
-        console.error("API Error:", error);
-        updateStatus(t.error);
-        isDataLoaded = false;
-    }
+// --- BINANCE WEBSOCKET (لا يحتاج CORS!) ---
+function connectBinanceWebSocket() {
+    console.log(" Connecting to Binance WebSocket...");
+    
+    const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+    
+    ws.onopen = () => {
+        console.log("✅ Binance WebSocket Connected");
+        wsConnected = true;
+        els.convError.style.display = 'none';
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const price = parseFloat(data.p);
+        
+        if (price > 0) {
+            btcPriceUSD = price;
+            updateUI(btcPriceUSD, usdToMru);
+            console.log("📊 BTC Price:", price);
+        }    };
+    
+    ws.onerror = (error) => {
+        console.error("❌ WebSocket Error:", error);
+        wsConnected = false;
+    };
+    
+    ws.onclose = () => {
+        console.log("🔌 WebSocket Closed, reconnecting...");
+        wsConnected = false;
+        setTimeout(connectBinanceWebSocket, 5000);
+    };
 }
 
-// --- UI UPDATES ---
-function animateValue(element, value, currency, decimals) {
-    const formatted = new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-    }).format(value);
+// --- FETCH EXCHANGE RATE ---
+async function fetchExchangeRate() {
+    const t = translations[currentLang];
     
-    // Flash animation on update
-    element.style.color = "#00ff88";
-    element.style.textShadow = "0 0 20px #00ff88";
+    for (let proxy of CORS_PROXIES) {
+        try {
+            const url = `https://v6.exchangerate-api.com/v6/${API_KEYS.EXCHANGE_RATE}/latest/USD`;
+            const response = await fetch(proxy + encodeURIComponent(url));
+            
+            if (response.ok) {
+                const data = await response.json();
+                const rate = data.conversion_rates.MRU;
+                
+                if (rate && rate > 0) {
+                    usdToMru = rate;
+                    updateUI(btcPriceUSD, usdToMru);
+                    console.log("✅ USD to MRU:", rate);
+                    return; // نجح، اخرج من الحلقة
+                }
+            }
+        } catch (error) {
+            console.warn(`Proxy failed: ${proxy}`, error);
+            // جرب البروكسي التالي
+        }
+    }
+    
+    // إذا كل البروكسيات فشلت، استخدم سعر تقريبي
+    console.log("⚠️ Using fallback exchange rate");
+    updateUI(btcPriceUSD, usdToMru);
+}
+
+// --- UPDATE UI ---
+function updateUI(btc, mru) {
+    isDataLoaded = true;
+    
+    // تحديث BTC    els.btcUsd.style.color = "#00ff88";
+    els.btcUsd.style.textShadow = "0 0 20px #00ff88";
+    els.btcUsd.innerText = `$ ${btc.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     
     setTimeout(() => {
-        element.style.color = "";
-        element.style.textShadow = "";
+        els.btcUsd.style.color = "";
+        els.btcUsd.style.textShadow = "";
     }, 600);
     
-    element.innerText = `${currency} ${formatted}`;
-}
-
-function updateStatus(msg) {
+    // تحديث MRU
+    els.usdMru.style.color = "#00f0ff";
+    els.usdMru.style.textShadow = "0 0 20px #00f0ff";
+    els.usdMru.innerText = `${mru.toLocaleString('en-US', {minimumFractionDigits: 4, maximumFractionDigits: 4})} MRU`;
+    
+    setTimeout(() => {
+        els.usdMru.style.color = "";
+        els.usdMru.style.textShadow = "";
+    }, 600);
+    
+    // تحديث الوقت
     const now = new Date();
     const timeString = now.toLocaleTimeString();
-    
-    let prefix = translations.en.last_updated;
-    if(currentLang === 'ar') prefix = translations.ar.last_updated;
-    if(currentLang === 'fr') prefix = translations.fr.last_updated;
-
+    let prefix = translations[currentLang].last_updated;
     els.lastUpdated.innerText = `${prefix} ${timeString}`;
+    
+    // إخفاء رسالة الخطأ
+    els.convError.style.display = 'none';
 }
 
 // --- LANGUAGE SWITCHER ---
@@ -145,22 +180,21 @@ function setLanguage(lang) {
     const t = translations[lang];
     const dir = lang === 'ar' ? 'rtl' : 'ltr';
     
-    document.body.style.direction = dir;    document.documentElement.lang = lang;
-
+    document.body.style.direction = dir;
+    document.documentElement.lang = lang;
+    
+    // Update buttons
+    document.getElementById('btn-en').classList.remove('active');
+    document.getElementById('btn-ar').classList.remove('active');
+    document.getElementById(`btn-${lang}`).classList.add('active');
+    
+    // Update text
     document.getElementById('tab-dashboard').innerText = t.dashboard;
     document.getElementById('tab-converter').innerText = t.converter;
-    
     document.getElementById('lbl-btc-usd').innerText = t.lbl_btc_usd;
     document.getElementById('lbl-usd-mru').innerText = t.lbl_usd_mru;
-    
     document.getElementById('lbl-convert-title').innerText = t.convert_title;
-    document.getElementById('btn-convert').innerText = t.btn_convert;
-
-    if(!isDataLoaded) {
-        els.btcUsd.innerText = t.loading;
-        els.usdMru.innerText = t.loading;
-    }
-}
+    document.getElementById('btn-convert').innerText = t.btn_convert;}
 
 // --- TABS LOGIC ---
 els.tabBtns.forEach(btn => {
@@ -168,70 +202,45 @@ els.tabBtns.forEach(btn => {
         els.tabBtns.forEach(b => b.classList.remove('active'));
         els.sections.forEach(s => s.classList.remove('active'));
         btn.classList.add('active');
-        const target = document.getElementById(btn.dataset.tab);
-        target.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
     });
 });
 
-// --- CONVERTER LOGIC (FIXED & ACCURATE) ---
+// --- CONVERTER ---
 function convertCurrency() {
     const amount = parseFloat(els.convAmount.value);
     const from = els.convFrom.value;
     const to = els.convTo.value;
     
     els.convError.style.display = 'none';
-
-    // Validate input
+    
     if (!amount || amount <= 0 || isNaN(amount)) {
         els.convResult.value = "0";
         return;
     }
-
-    // Check if data is loaded
-    if (!isDataLoaded || btcPriceUSD === 0 || usdToMru === 0) {
-        els.convError.innerText = translations[currentLang].error_msg;
-        els.convError.style.display = 'block';
-        els.convResult.value = "";
-        return;
-    }
-    let result = 0;
-
-    // Step 1: Convert everything to USD first (base currency)
+    
+    // حتى لو البيانات تقريبية، نحسب
     let amountInUSD = 0;
-
-    if (from === 'USD') {
-        amountInUSD = amount;
-    } else if (from === 'BTC') {
-        amountInUSD = amount * btcPriceUSD;
-    } else if (from === 'MRU') {
-        amountInUSD = amount / usdToMru;
-    }
-
-    // Step 2: Convert from USD to Target currency
-    if (to === 'USD') {
-        result = amountInUSD;
-    } else if (to === 'BTC') {
-        result = amountInUSD / btcPriceUSD;
-    } else if (to === 'MRU') {
-        result = amountInUSD * usdToMru;
-    }
-
-    // Step 3: Format result with appropriate precision
-    let decimals = 2;
-    if (to === 'BTC') decimals = 8; // Bitcoin needs 8 decimals for accuracy
-    if (to === 'MRU') decimals = 2; 
-    if (to === 'USD') decimals = 2;
-
+    if (from === 'USD') amountInUSD = amount;
+    else if (from === 'BTC') amountInUSD = amount * btcPriceUSD;
+    else if (from === 'MRU') amountInUSD = amount / usdToMru;
+    
+    let result = 0;
+    if (to === 'USD') result = amountInUSD;
+    else if (to === 'BTC') result = amountInUSD / btcPriceUSD;
+    else if (to === 'MRU') result = amountInUSD * usdToMru;
+    
+    let decimals = to === 'BTC' ? 8 : 2;
     const formattedResult = new Intl.NumberFormat('en-US', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     }).format(result);
-
+    
     els.convResult.value = formattedResult;
     
-    // Success flash
+    // Success animation
     els.convResult.style.borderColor = "#00ff88";
     setTimeout(() => {
         els.convResult.style.borderColor = "rgba(255,255,255,0.2)";
     }, 500);
-            }
+        }
