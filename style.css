@@ -47,7 +47,8 @@ body {
 .highlight { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
 
 .lang-selector button {
-    background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-main);    padding: 5px 10px; cursor: pointer; margin-left: 5px; border-radius: 5px; transition: 0.3s;
+    background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-main);    padding: 8px 15px; cursor: pointer; margin-left: 5px; border-radius: 5px; transition: 0.3s;
+    font-size: 0.9rem;
 }
 .lang-selector button.active, .lang-selector button:hover {
     background: var(--neon-green); color: #000; border-color: var(--neon-green);
@@ -108,7 +109,6 @@ body {
     opacity: 0.6;
 }
 
-/* Special Glow for MRU Card */
 .glow-effect { border: 1px solid var(--neon-blue); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); }
 .glow-effect .card-header i { color: var(--neon-blue); }
 .glow-effect .price-value { color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
@@ -133,9 +133,16 @@ input:focus, select:focus { outline: none; border-color: var(--neon-green); }
 }
 #btn-convert:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(188, 19, 254, 0.5); }
 
+.error-msg {
+    color: #ff4444;
+    margin-top: 10px;
+    display: none;
+    font-size: 0.9rem;
+}
+
 @media (max-width: 600px) {
     .price-value { font-size: 1.8rem; }
     .navbar { flex-direction: column; gap: 15px; }
     .tabs { flex-wrap: wrap; }
     .input-group { flex-direction: column; }
-      }
+}
